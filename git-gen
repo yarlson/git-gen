@@ -79,14 +79,27 @@ while true; do
         MESSAGE="$JIRA_TICKET $MESSAGE"
     fi
 
-    # Print the generated message and ask for confirmation
+    # Print the generated message and ask for confirmation or edit
     echo -e "${YELLOW}Generated commit message: ${NC}$MESSAGE"
-    echo -ne "${PURPLE}Is this commit message ok? (y/n): ${NC}"
+    echo -ne "${PURPLE}Is this commit message ok? (y/n/e for edit): ${NC}"
     read CONFIRMATION
 
-    if [ "$CONFIRMATION" = "y" ]; then
-        break
-    fi
+    case $CONFIRMATION in
+        y)
+            break
+            ;;
+        n)
+            continue
+            ;;
+        e)
+            # Open an editor to manually edit the message
+            echo "$MESSAGE" > temp_commit_message.txt
+            ${EDITOR:-vim} temp_commit_message.txt
+            MESSAGE=$(<temp_commit_message.txt)
+            rm temp_commit_message.txt
+            break
+            ;;
+    esac
 done
 
 # Commit changes with the generated message
