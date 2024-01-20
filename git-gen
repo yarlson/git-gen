@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Get the current working directory
+REPO_DIR=$(git rev-parse --show-toplevel)
+if [ -z "$REPO_DIR" ]; then
+    echo "Not a git repository."
+    exit 1
+fi
+cd "$REPO_DIR" || exit 1
+
+# Add all changes to the index
+git add .
+
+# Get lists of added, deleted, and modified files
+ADDED_FILES=$(git diff --cached --name-only --diff-filter=A)
+DELETED_FILES=$(git diff --cached --name-only --diff-filter=D)
+MODIFIED_FILES=$(git diff --cached --name-only --diff-filter=M)
+
+# Get current diff
+DIFF=$(git diff --cached)
+
+# Construct JSON payload with jq
+PAYLOAD=$(jq -n \
+    --arg diff "$DIFF" \
+    --arg addedFiles "$ADDED_FILES" \
+    --arg deletedFiles "$DELETED_FILES" \
+    --arg modifiedFiles "$MODIFIED_FILES" \
+    '{
+        "model": "gpt-4-1106-preview",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant tasked with generating concise and informative commit messages. Analyze the provided list of added, deleted, and modified files along with the diff details. Based on this information, create a commit message that summarizes the changes effectively."
+          },
+          {
+            "role": "user",
+            "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details: \n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
+          }
+        ]
+      }')
+
+# Call OpenAI API using the v1/completions endpoint
+MESSAGE=$(curl -s -X POST \
+    https://api.openai.com/v1/chat/completions \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" | jq -r '.choices[0].message.content')
+
+# Check if message is valid
+if [ -z "$MESSAGE" ]; then
+    echo "Failed to generate commit message"
+    exit 1
+fi
+
+echo $MESSAGE
