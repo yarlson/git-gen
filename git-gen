@@ -42,7 +42,7 @@ while true; do
               },
               {
                 "role": "user",
-                "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details: \n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
+                "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details, use imperative mood: \n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
               }
             ]
           }')
