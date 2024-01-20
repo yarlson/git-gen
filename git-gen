@@ -72,4 +72,4 @@ done
 
 # Commit changes with the generated message
 git commit -am "$MESSAGE"
-echo -e "${GREEN}Changes committed with message: ${NC}$MESSAGE"
+echo -e "${GREEN}Changes committed${NC}"
