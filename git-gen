@@ -13,8 +13,8 @@ JIRA_TICKET_REGEX='[A-Z]+-[0-9]+'
 # Get the current working directory
 REPO_DIR=$(git rev-parse --show-toplevel)
 if [ -z "$REPO_DIR" ]; then
-    echo -e "${RED}Not a git repository.${NC}"
-    exit 1
+	echo -e "${RED}Not a git repository.${NC}"
+	exit 1
 fi
 cd "$REPO_DIR" || exit 1
 
@@ -23,31 +23,31 @@ BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 
 # Extract Jira ticket ID from branch name
 if [[ "$BRANCH_NAME" == *"/"* ]]; then
-    LAST_PART=$(echo "$BRANCH_NAME" | awk -F'/' '{print $NF}')
-    JIRA_TICKET=$(echo "$LAST_PART" | grep -oE "$JIRA_TICKET_REGEX")
+	LAST_PART=$(echo "$BRANCH_NAME" | awk -F'/' '{print $NF}')
+	JIRA_TICKET=$(echo "$LAST_PART" | grep -oE "$JIRA_TICKET_REGEX")
 else
-    JIRA_TICKET=$(echo "$BRANCH_NAME" | grep -oE "$JIRA_TICKET_REGEX")
+	JIRA_TICKET=$(echo "$BRANCH_NAME" | grep -oE "$JIRA_TICKET_REGEX")
 fi
 
 # Add all changes to the index
 git add .
 
 # Get lists of added, deleted, and modified files
-ADDED_FILES=$(git diff --cached --name-only --diff-filter=A)
-DELETED_FILES=$(git diff --cached --name-only --diff-filter=D)
-MODIFIED_FILES=$(git diff --cached --name-only --diff-filter=M)
+ADDED_FILES=$(git diff -w -U5 --cached --name-only --diff-filter=A)
+DELETED_FILES=$(git diff -w -U5 --cached --name-only --diff-filter=D)
+MODIFIED_FILES=$(git diff -w -U5 --cached --name-only --diff-filter=M)
 
 # Get current diff
 DIFF=$(git diff --cached)
 
 while true; do
-    # Construct JSON payload with jq
-    PAYLOAD=$(jq -n \
-        --arg diff "$DIFF" \
-        --arg addedFiles "$ADDED_FILES" \
-        --arg deletedFiles "$DELETED_FILES" \
-        --arg modifiedFiles "$MODIFIED_FILES" \
-        '{
+	# Construct JSON payload with jq
+	PAYLOAD=$(jq -n \
+		--arg diff "$DIFF" \
+		--arg addedFiles "$ADDED_FILES" \
+		--arg deletedFiles "$DELETED_FILES" \
+		--arg modifiedFiles "$MODIFIED_FILES" \
+		'{
             "model": "gpt-4-1106-preview",
             "messages": [
               {
@@ -56,52 +56,52 @@ while true; do
               },
               {
                 "role": "user",
-                "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details, use imperative mood, start the commit message with a single playful emoji, emphasizing the essence of the message: \n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
+                "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details, use imperative mood, emphasizing the essence of the message: \n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
               }
             ]
           }')
 
-    # Call OpenAI API using the v1/completions endpoint
-    MESSAGE=$(curl -s -X POST \
-        https://api.openai.com/v1/chat/completions \
-        -H "Authorization: Bearer $OPENAI_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "$PAYLOAD" | jq -r '.choices[0].message.content')
+	# Call OpenAI API using the v1/completions endpoint
+	MESSAGE=$(curl -s -X POST \
+		https://api.openai.com/v1/chat/completions \
+		-H "Authorization: Bearer $OPENAI_API_KEY" \
+		-H "Content-Type: application/json" \
+		-d "$PAYLOAD" | jq -r '.choices[0].message.content')
 
-    # Check if message is valid
-    if [ -z "$MESSAGE" ]; then
-        echo -e "${RED}Failed to generate commit message${NC}"
-        exit 1
-    fi
+	# Check if message is valid
+	if [ -z "$MESSAGE" ]; then
+		echo -e "${RED}Failed to generate commit message${NC}"
+		exit 1
+	fi
 
-    # Prepend Jira ticket ID if present
-    if [ -n "$JIRA_TICKET" ]; then
-        MESSAGE="$JIRA_TICKET $MESSAGE"
-    fi
+	# Prepend Jira ticket ID if present
+	if [ -n "$JIRA_TICKET" ]; then
+		MESSAGE="$JIRA_TICKET $MESSAGE"
+	fi
 
-    # Print the generated message and ask for confirmation or edit
-    echo -e "${YELLOW}Generated commit message: ${NC}$MESSAGE"
-    echo -ne "${PURPLE}Is this commit message ok? (y/n/e for edit): ${NC}"
-    read CONFIRMATION
+	# Print the generated message and ask for confirmation or edit
+	echo -e "${YELLOW}Generated commit message: ${NC}$MESSAGE"
+	echo -ne "${PURPLE}Is this commit message ok? (y/n/e for edit): ${NC}"
+	read CONFIRMATION
 
-    case $CONFIRMATION in
-        y)
-            break
-            ;;
-        n)
-            continue
-            ;;
-        e)
-            # Open an editor to manually edit the message
-            echo "$MESSAGE" > temp_commit_message.txt
-            ${EDITOR:-vim} temp_commit_message.txt
-            MESSAGE=$(<temp_commit_message.txt)
-            rm temp_commit_message.txt
-            break
-            ;;
-    esac
+	case $CONFIRMATION in
+	y)
+		break
+		;;
+	n)
+		continue
+		;;
+	e)
+		# Open an editor to manually edit the message
+		echo "$MESSAGE" >temp_commit_message.txt
+		${EDITOR:-vim} temp_commit_message.txt
+		MESSAGE=$(<temp_commit_message.txt)
+		rm temp_commit_message.txt
+		break
+		;;
+	esac
 done
 
 # Commit changes with the generated message
-git commit -am "$MESSAGE"
+git commit -am "$MESSAGE" --no-verify
 echo -e "${GREEN}Changes committed${NC}"
