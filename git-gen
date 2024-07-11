@@ -33,6 +33,9 @@ MODIFIED_FILES=$(git diff --cached --name-only --diff-filter=M)
 # Get current diff
 DIFF=$(git diff --cached)
 
+# Get last 10 commit messages
+LAST_10_COMMITS=$(git log -n 10 --pretty=format:"%s")
+
 generate_commit_message() {
     local payload
     payload=$(jq -n \
@@ -40,16 +43,17 @@ generate_commit_message() {
         --arg addedFiles "$ADDED_FILES" \
         --arg deletedFiles "$DELETED_FILES" \
         --arg modifiedFiles "$MODIFIED_FILES" \
+        --arg lastCommits "$LAST_10_COMMITS" \
         '{
             "model": "gpt-4o",
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant tasked with generating concise and informative commit messages. Analyze the provided list of added, deleted, and modified files along with the diff details. Based on this information, create a commit message that summarizes the changes effectively."
+                    "content": "You are a helpful assistant tasked with generating concise and informative commit messages. Analyze the provided list of added, deleted, and modified files along with the diff details and previous commit messages. Based on this information, create a commit message that summarizes the changes effectively and maintains consistency with the project'"'"'s commit history."
                 },
                 {
                     "role": "user",
-                    "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details, use imperative mood, emphasizing the essence of the message: \n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
+                    "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details, use imperative mood, emphasizing the essence of the message. Consider the following previous commit messages for consistency:\n" + $lastCommits + "\n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
                 }
             ]
         }')
