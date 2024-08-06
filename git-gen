@@ -48,11 +48,37 @@ generate_commit_message() {
             '{
                 "model": "claude-3-5-sonnet-20240620",
                 "max_tokens": 1024,
-                "system": "You are a helpful assistant tasked with generating concise and informative commit messages. Analyze the provided list of added, deleted, and modified files along with the diff details and previous commit messages. Based on this information, create a commit message that summarizes the changes effectively and maintains consistency with the project'"'"'s commit history.",
                 "messages": [
                     {
                         "role": "user",
-                        "content": ("Generate a short commit message for these changes, do not include a list of added, updated or deleted files, do not describe the commit message, provide only commit message itself, in the commit message describe only business logic, not implementation details, use imperative mood, emphasizing the essence of the message. Do not use emojis. Consider the following previous commit messages for consistency:\n" + $lastCommits + "\n\nAdded files:\n" + $addedFiles + "\nDeleted files:\n" + $deletedFiles + "\nModified files:\n" + $modifiedFiles + "\n\n```\n" + $diff + "\n```")
+                        "content": (
+                            "You are tasked with generating a concise and meaningful commit message based on code changes. Follow these guidelines to create an effective commit message:\n\n" +
+                            "1. Use imperative mood (e.g., \"Add feature\" instead of \"Added feature\")\n" +
+                            "2. Focus on describing the business logic, not implementation details\n" +
+                            "3. Keep the message short and to the point\n" +
+                            "4. Do not include a list of added, updated, or deleted files\n" +
+                            "5. Do not use emojis\n" +
+                            "6. Emphasize the essence of the changes\n\n" +
+                            "7. Use Conventional Commits 1.0.0\n\n" +
+                            "First, review the following previous commit messages for consistency:\n" +
+                            "<lastCommits>\n" + $lastCommits + "\n" +
+                            "</lastCommits>\n\n" +
+                            "Now, examine the lists of files that have been affected:\n\n" +
+                            "Added files:\n" +
+                            "<addedFiles>\n" + $addedFiles + "\n" +
+                            "</addedFiles>\n\n" +
+                            "Deleted files:\n" +
+                            "<deletedFiles>\n" + $deletedFiles + "\n" +
+                            "</deletedFiles>\n\n" +
+                            "Modified files:\n" +
+                            "<modifiedFiles>\n" + $modifiedFiles + "\n" +
+                            "</modifiedFiles>\n\n" +
+                            "Finally, analyze the diff of the changes:\n\n" +
+                            "<diff>\n" + $diff + "\n" +
+                            "</diff>\n\n" +
+                            "Based on this information, generate a short commit message that captures the essence of the changes, focusing on the business logic and maintaining consistency with the previous commit messages. Remember to use imperative mood and avoid implementation details.\n\n" +
+                            "Provide only commit message.. Do not include any explanation or description of the commit message itself."
+                        )
                     }
                 ]
             }'
