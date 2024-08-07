@@ -54,12 +54,17 @@ generate_commit_message() {
                         "content": (
                             "You are tasked with generating a concise and meaningful commit message based on code changes. Follow these guidelines to create an effective commit message:\n\n" +
                             "1. Use imperative mood (e.g., \"Add feature\" instead of \"Added feature\")\n" +
-                            "2. Focus on describing the business logic, not implementation details\n" +
+                            "2. Use Conventional Commits 1.0.0\n" +
                             "3. Keep the message short and to the point\n" +
                             "4. Do not include a list of added, updated, or deleted files\n" +
                             "5. Do not use emojis\n" +
-                            "6. Emphasize the essence of the changes\n\n" +
-                            "7. Use Conventional Commits 1.0.0\n\n" +
+                            "6. For refactor commits:\n" +
+                            "   - Be more technical and include some implementation details\n" +
+                            "   - Mention specific components, functions, or modules being refactored\n" +
+                            "   - Briefly describe the nature of the refactoring (e.g., \"Extract method\", \"Rename variable\", \"Optimize algorithm\")\n" +
+                            "7. For other types of commits:\n" +
+                            "   - Focus on describing the business logic, not implementation details\n" +
+                            "   - Emphasize the essence of the changes\n\n" +
                             "First, review the following previous commit messages for consistency:\n" +
                             "<lastCommits>\n" + $lastCommits + "\n" +
                             "</lastCommits>\n\n" +
@@ -76,8 +81,8 @@ generate_commit_message() {
                             "Finally, analyze the diff of the changes:\n\n" +
                             "<diff>\n" + $diff + "\n" +
                             "</diff>\n\n" +
-                            "Based on this information, generate a short commit message that captures the essence of the changes, focusing on the business logic and maintaining consistency with the previous commit messages. Remember to use imperative mood and avoid implementation details.\n\n" +
-                            "Provide only commit message.. Do not include any explanation or description of the commit message itself."
+                            "Based on this information, generate a short commit message that captures the essence of the changes. For refactor commits, include more technical details and specific components being refactored. For other types of commits, focus on the business logic and maintain consistency with the previous commit messages. Remember to use imperative mood.\n\n" +
+                            "Provide only the commit message. Do not include any explanation or description of the commit message itself."
                         )
                     }
                 ]
