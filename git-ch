@@ -24,21 +24,17 @@ cd "$REPO_DIR" || exit 1
 TAGS=($(git tag -l | sort -V | tail -n 2))
 
 if [ ${#TAGS[@]} -lt 2 ]; then
-    echo -e "${RED}Need at least two tags to generate changelog${NC}"
     exit 1
 fi
 
 OLD_TAG="${TAGS[0]}"
 NEW_TAG="${TAGS[1]}"
 
-echo -e "${YELLOW}Generating changelog between tags:${NC}"
-echo -e "Old tag: ${OLD_TAG}"
-echo -e "New tag: ${NEW_TAG}"
-
 # Get the commit hash for the new tag
 NEW_TAG_COMMIT=$(git rev-list -n 1 "${NEW_TAG}")
 
 # Get all commits between tags, excluding the old tag's commit and README changes
+COMMITS_FOR_LOG=$(git log "${OLD_TAG}..${NEW_TAG_COMMIT}" --pretty=format:"%H %s" -- . ':!README.md')
 COMMITS=$(git log "${OLD_TAG}..${NEW_TAG_COMMIT}" --pretty=format:"%s" -- . ':!README.md')
 
 # Get the diff between tags, excluding README.md
@@ -191,16 +187,22 @@ RETRY_STATUS=$?
 
 # If we got "retrying_without_diff", try again without diff
 if [ "$CHANGELOG" = "retrying_without_diff" ]; then
-    echo -e "${YELLOW}Retrying without diff due to context length...${NC}"
     CHANGELOG=$(generate_changelog false)
     RETRY_STATUS=$?
 fi
 
-if [ $RETRY_STATUS -ne 0 ]; then
-    exit 1
+if [ $RETRY_STATUS -eq 0 ]; then
+    {
+        echo "$CHANGELOG"
+        echo
+        echo "## Commits"
+        echo "$COMMITS_FOR_LOG" | while read -r line; do
+            commit_hash=$(echo "$line" | cut -d' ' -f1)
+            commit_msg=$(echo "$line" | cut -d' ' -f2-)
+            echo "* $commit_hash $commit_msg"
+        done
+    }
 fi
-
-# Save the changelog to file
-echo "$CHANGELOG" > "CHANGELOG-${NEW_TAG}.md"
+exit $RETRY_STATUS
 
 echo -e "${GREEN}Changelog generated as CHANGELOG-${NEW_TAG}.md${NC}"
