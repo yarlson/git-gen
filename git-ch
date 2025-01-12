@@ -49,9 +49,19 @@ generate_changelog() {
 
     # Create the system message with changelog guidelines
     local system_message=$(cat << EOT
-You are a technical changelog generator that produces clear, concise, and well-structured changelogs. Your task is to analyze the commits and diff to identify and summarize key changes.
+You are a technical changelog generator that produces clear, concise, and well-structured changelogs. Your task is to analyze conventional commit messages and their diffs to identify and summarize key changes.
 
-1. Structure:
+1. Commit Message Mapping:
+   - feat: -> Features section
+   - fix: -> Bug Fixes section
+   - perf: -> Improvements section
+   - refactor: -> Improvements section
+   - BREAKING CHANGE: -> Breaking Changes section
+   - Any commits with breaking changes indicator (!) -> Breaking Changes section
+   - deps: -> relevant section based on impact
+   - build: -> only if it affects users
+
+2. Structure:
    - Use only these sections in order: Breaking Changes, Features, Improvements, Bug Fixes
    - Only include sections that have content
    - Focus on significant changes that affect users or the system
@@ -59,7 +69,7 @@ You are a technical changelog generator that produces clear, concise, and well-s
    - Be concise and specific
    - Exclude documentation changes (like README updates)
 
-2. Format:
+3. Format:
    - First line must be "# Version X.Y.Z" (using provided version)
    - Use "### Section Name" for sections
    - One blank line after section header
@@ -67,13 +77,6 @@ You are a technical changelog generator that produces clear, concise, and well-s
    - One blank line between sections
    - Remove trailing period from bullet points
    - When a section has no relevant changes, either omit it or note "No changes"
-
-3. Style:
-   - Technical but clear language
-   - Start each bullet with a verb in past tense (Added, Updated, Fixed, etc.)
-   - Focus on the change and its impact
-   - Be specific about what changed
-   - No emojis or decorative elements
 
 4. Example:
    # Version 2.1.0
@@ -100,9 +103,9 @@ EOT
     local escaped_system=$(echo "$system_message" | jq -R -s .)
 
     # Create the user message
-    # First escape all our variables using jq
+    # First escape all our variables using jq and base64 for diff
     local escaped_commits=$(echo "$COMMITS" | jq -R -s .)
-    local escaped_diff=$(echo "$DIFF" | jq -R -s .)
+    local escaped_diff=$(echo "$DIFF" | base64 | jq -R -s .)
     local escaped_tag=$(echo "$NEW_TAG" | jq -R -s .)
 
     # Create the user message with proper XML structure
@@ -116,12 +119,12 @@ EOT
 ${escaped_commits}
   </commits>
 
-  <diff>
+  <diff encoding="base64">
 ${escaped_diff}
   </diff>
 </context>
 
-Based on the commits and diff above, generate a changelog for the specified version. Follow the guidelines to create a clear, technical changelog that highlights significant changes, improvements, and fixes.
+Based on the commits and diff above, generate a changelog for the specified version. The diff is base64 encoded - decode it first. Follow the guidelines to create a clear, technical changelog that highlights significant changes, improvements, and fixes.
 EOT
 )
     else
