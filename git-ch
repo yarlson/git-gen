@@ -1,0 +1,201 @@
+#!/bin/bash
+
+# ANSI color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+NC='\033[0m' # No Color
+
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo -e "${RED}ERROR: ANTHROPIC_API_KEY is not set${NC}" >&2
+    exit 1
+fi
+
+# Check if in a git repository
+if ! REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null); then
+    echo -e "${RED}Not a git repository.${NC}"
+    exit 1
+fi
+
+cd "$REPO_DIR" || exit 1
+
+# Get the last two tags sorted by version number (natural sort)
+TAGS=($(git tag -l | sort -V | tail -n 2))
+
+if [ ${#TAGS[@]} -lt 2 ]; then
+    echo -e "${RED}Need at least two tags to generate changelog${NC}"
+    exit 1
+fi
+
+OLD_TAG="${TAGS[0]}"
+NEW_TAG="${TAGS[1]}"
+
+echo -e "${YELLOW}Generating changelog between tags:${NC}"
+echo -e "Old tag: ${OLD_TAG}"
+echo -e "New tag: ${NEW_TAG}"
+
+# Get the commit hash for the new tag
+NEW_TAG_COMMIT=$(git rev-list -n 1 "${NEW_TAG}")
+
+# Get all commits between tags, excluding the old tag's commit
+COMMITS=$(git log "${OLD_TAG}..${NEW_TAG_COMMIT}" --pretty=format:"%s")
+
+# Get the diff between tags
+DIFF=$(git diff "${OLD_TAG}..${NEW_TAG}")
+
+generate_changelog() {
+    local include_diff=$1
+
+    # Create the system message with changelog guidelines
+    local system_message=$(cat << EOT
+You are a technical changelog generator that produces clear, concise, and well-structured changelogs. Your task is to analyze the commits and diff to identify and summarize key changes, WITHOUT including the list of individual commits.
+
+1. Structure:
+   - Group changes into only these sections: Features, Improvements, Bug Fixes, Breaking Changes
+   - Focus on user-facing changes and significant technical improvements
+   - Summarize related commits into single, meaningful entries
+   - Use clear, technical language without being verbose
+   - Include significant dependency updates within appropriate sections (e.g., breaking changes for major version updates, improvements for performance-related updates)
+
+2. Format:
+   - Use ### for section headers
+   - Use bullet points for concise summaries
+   - Keep descriptions technical but accessible
+   - Highlight breaking changes prominently
+   - Include version number in the header
+
+3. Style:
+   - Technical and precise language
+   - Focus on impact and implications
+   - Include metrics when available (e.g., "reduced latency by 30%")
+   - Highlight API changes clearly
+   - No emojis or decorative elements
+
+4. Output Format Example:
+   # Version 2.1.0
+
+   ### Breaking Changes
+   - Changed authentication flow to OAuth2-only, existing API keys must be migrated
+   - Upgraded React to v18, requires application-wide updates to use new rendering engine
+
+   ### Features
+   - Added GraphQL API support with full schema documentation
+   - Implemented real-time data synchronization using WebSockets
+
+   ### Improvements
+   - Enhanced caching strategy, reducing average response time by 45%
+   - Updated Redis client to v7.2, improving connection stability
+   - Standardized error responses across all API endpoints
+
+   ### Bug Fixes
+   - Resolved race condition in concurrent file uploads
+   - Fixed memory leak in WebSocket connection handling
+
+Respond with only the changelog content, no explanations or additional text.
+EOT
+)
+    local escaped_system=$(echo "$system_message" | jq -R -s .)
+
+    # Create the user message
+    # First escape all our variables using jq
+    local escaped_commits=$(echo "$COMMITS" | jq -R -s .)
+    local escaped_diff=$(echo "$DIFF" | jq -R -s .)
+    local escaped_tag=$(echo "$NEW_TAG" | jq -R -s .)
+
+    # Create the user message with proper XML structure
+    local user_message
+    if [ "$include_diff" = true ]; then
+        user_message=$(cat << EOT
+<context>
+  <version>${escaped_tag}</version>
+
+  <commits>
+${escaped_commits}
+  </commits>
+
+  <diff>
+${escaped_diff}
+  </diff>
+</context>
+
+Based on the commits and diff above, generate a changelog for the specified version. Follow the guidelines to create a clear, technical changelog that highlights significant changes, improvements, and fixes.
+EOT
+)
+    else
+        user_message=$(cat << EOT
+<context>
+  <version>${escaped_tag}</version>
+
+  <commits>
+${escaped_commits}
+  </commits>
+</context>
+
+Based on the commits above, generate a changelog for the specified version. Follow the guidelines to create a clear, technical changelog that highlights significant changes, improvements, and fixes.
+EOT
+)
+    fi
+    local escaped_user=$(echo "$user_message" | jq -R -s .)
+
+    # Make the API call
+    local response=$(curl -s -X POST \
+        https://api.anthropic.com/v1/messages \
+        --header "x-api-key: $ANTHROPIC_API_KEY" \
+        --header "anthropic-version: 2023-06-01" \
+        --header "content-type: application/json" \
+        -d @- << EOF
+{
+    "model": "claude-3-5-sonnet-20240620",
+    "max_tokens": 2048,
+    "system": ${escaped_system},
+    "messages": [
+        {
+            "role": "user",
+            "content": ${escaped_user}
+        }
+    ]
+}
+EOF
+)
+
+    # Check if the response contains an error
+    if echo "$response" | jq -e 'has("error")' > /dev/null; then
+        local error_message=$(echo "$response" | jq -r '.error.message')
+        if [[ "$error_message" == *"context_length"* ]] && [ "$include_diff" = true ]; then
+            echo "retrying_without_diff"
+            return
+        fi
+        echo -e "${RED}API Error: $error_message${NC}" >&2
+        return 1
+    fi
+
+    # Extract and verify the changelog
+    local changelog=$(echo "$response" | jq -r '.content[0].text // empty')
+    if [ -z "$changelog" ]; then
+        echo -e "${RED}Error: Empty changelog in response${NC}" >&2
+        return 1
+    fi
+
+    echo "$changelog"
+}
+
+# First try with diff
+CHANGELOG=$(generate_changelog true)
+RETRY_STATUS=$?
+
+# If we got "retrying_without_diff", try again without diff
+if [ "$CHANGELOG" = "retrying_without_diff" ]; then
+    echo -e "${YELLOW}Retrying without diff due to context length...${NC}"
+    CHANGELOG=$(generate_changelog false)
+    RETRY_STATUS=$?
+fi
+
+if [ $RETRY_STATUS -ne 0 ]; then
+    exit 1
+fi
+
+# Save the changelog to file
+echo "$CHANGELOG" > "CHANGELOG-${NEW_TAG}.md"
+
+echo -e "${GREEN}Changelog generated as CHANGELOG-${NEW_TAG}.md${NC}"
