@@ -9,6 +9,11 @@ NC='\033[0m' # No Color
 
 JIRA_TICKET_REGEX='[A-Z]+-[0-9]+'
 
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo -e "${RED}ERROR: ANTHROPIC_API_KEY is not set${NC}" >&2
+    exit 1
+fi
+
 # Check if in a git repository
 if ! REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null); then
     echo -e "${RED}Not a git repository.${NC}"
@@ -37,70 +42,93 @@ DIFF=$(git diff --cached)
 LAST_10_COMMITS=$(git log -n 10 --pretty=format:"%s")
 
 generate_commit_message() {
-    local payload
-    payload=$(
-        jq -n \
-            --arg diff "$DIFF" \
-            --arg addedFiles "$ADDED_FILES" \
-            --arg deletedFiles "$DELETED_FILES" \
-            --arg modifiedFiles "$MODIFIED_FILES" \
-            --arg lastCommits "$LAST_10_COMMITS" \
-            '{
-                "model": "claude-3-5-sonnet-20240620",
-                "max_tokens": 1024,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": (
-                            "You are tasked with generating a concise and meaningful commit message based on code changes. Follow these guidelines to create an effective commit message:\n\n" +
-                            "1. Use imperative mood (e.g., \"Add feature\" instead of \"Added feature\")\n" +
-                            "2. Use Conventional Commits 1.0.0\n" +
-                            "3. Keep the message short and to the point\n" +
-                            "4. Do not include a list of added, updated, or deleted files\n" +
-                            "5. Do not use emojis\n" +
-                            "6. For refactor commits:\n" +
-                            "   - Be more technical and include some implementation details\n" +
-                            "   - Mention specific components, functions, or modules being refactored\n" +
-                            "   - Briefly describe the nature of the refactoring (e.g., \"Extract method\", \"Rename variable\", \"Optimize algorithm\")\n" +
-                            "7. For other types of commits:\n" +
-                            "   - Focus on describing the business logic, not implementation details\n" +
-                            "   - Emphasize the essence of the changes\n\n" +
-                            "First, review the following previous commit messages for consistency:\n" +
-                            "<lastCommits>\n" + $lastCommits + "\n" +
-                            "</lastCommits>\n\n" +
-                            "Now, examine the lists of files that have been affected:\n\n" +
-                            "Added files:\n" +
-                            "<addedFiles>\n" + $addedFiles + "\n" +
-                            "</addedFiles>\n\n" +
-                            "Deleted files:\n" +
-                            "<deletedFiles>\n" + $deletedFiles + "\n" +
-                            "</deletedFiles>\n\n" +
-                            "Modified files:\n" +
-                            "<modifiedFiles>\n" + $modifiedFiles + "\n" +
-                            "</modifiedFiles>\n\n" +
-                            "Finally, analyze the diff of the changes:\n\n" +
-                            "<diff>\n" + $diff + "\n" +
-                            "</diff>\n\n" +
-                            "Based on this information, generate a short commit message that captures the essence of the changes. For refactor commits, include more technical details and specific components being refactored. For other types of commits, focus on the business logic and maintain consistency with the previous commit messages. Remember to use imperative mood.\n\n" +
-                            "Provide only the commit message. Do not include any explanation or description of the commit message itself."
-                        )
-                    }
-                ]
-            }'
-    )
+    # First escape all our variables using jq
+    local escaped_commits=$(echo "$LAST_10_COMMITS" | jq -R -s .)
+    local escaped_added=$(echo "$ADDED_FILES" | jq -R -s .)
+    local escaped_deleted=$(echo "$DELETED_FILES" | jq -R -s .)
+    local escaped_modified=$(echo "$MODIFIED_FILES" | jq -R -s .)
+    local escaped_diff=$(echo "$DIFF" | jq -R -s .)
 
-    curl -s -X POST \
+    # Create the instructions with variable substitution
+    local instructions=$(cat << EOT
+You are tasked with generating a concise and meaningful commit message based on code changes. Follow these guidelines to create an effective commit message:
+
+1. Use imperative mood (e.g., \"Add feature\" instead of \"Added feature\")
+2. Use Conventional Commits 1.0.0
+3. Keep the message short and to the point
+4. Do not include a list of added, updated, or deleted files
+5. Do not use emojis
+6. For refactor commits:
+   - Be more technical and include some implementation details
+   - Mention specific components, functions, or modules being refactored
+   - Briefly describe the nature of the refactoring (e.g., \"Extract method\", \"Rename variable\", \"Optimize algorithm\")
+7. For other types of commits:
+   - Focus on describing the business logic, not implementation details
+   - Emphasize the essence of the changes
+
+First, review the following previous commit messages for consistency:
+<lastCommits>
+${escaped_commits}
+</lastCommits>
+
+Now, examine the lists of files that have been affected:
+
+Added files:
+<addedFiles>
+${escaped_added}
+</addedFiles>
+
+Deleted files:
+<deletedFiles>
+${escaped_deleted}
+</deletedFiles>
+
+Modified files:
+<modifiedFiles>
+${escaped_modified}
+</modifiedFiles>
+
+Finally, analyze the diff of the changes:
+
+<diff>
+${escaped_diff}
+</diff>
+
+Based on this information, generate a short commit message that captures the essence of the changes. For refactor commits, include more technical details and specific components being refactored. For other types of commits, focus on the business logic and maintain consistency with the previous commit messages. Remember to use imperative mood.
+
+Provide only the commit message. Do not include any explanation or description of the commit message itself.
+EOT
+)
+    local escaped_instructions=$(echo "$instructions" | jq -R -s .)
+
+    # Use heredoc for the payload with the escaped content
+    local response=$(curl -s -X POST \
         https://api.anthropic.com/v1/messages \
         --header "x-api-key: $ANTHROPIC_API_KEY" \
         --header "anthropic-version: 2023-06-01" \
         --header "content-type: application/json" \
-        --data "$payload" | jq -r '.content[0].text'
+        -d @- << EOF
+{
+    "model": "claude-3-5-sonnet-20240620",
+    "max_tokens": 1024,
+    "messages": [
+        {
+            "role": "user",
+            "content": ${escaped_instructions}
+        }
+    ]
+}
+EOF
+)
+    # Extract the commit message from the response
+    echo "$response" | jq -r '.content[0].text // empty'
 }
 
 while true; do
     MESSAGE=$(generate_commit_message)
+
     if [ -z "$MESSAGE" ]; then
-        echo -e "${RED}Failed to generate commit message${NC}"
+        echo -e "${RED}Failed to generate commit message${NC}" >&2
         exit 1
     fi
 
@@ -112,8 +140,12 @@ while true; do
     read -r CONFIRMATION
 
     case $CONFIRMATION in
-        y) break ;;
-        n) continue ;;
+        y)
+            break
+            ;;
+        n)
+            continue
+            ;;
         e)
             echo "$MESSAGE" > temp_commit_message.txt
             ${EDITOR:-vim} temp_commit_message.txt
