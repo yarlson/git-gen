@@ -38,11 +38,11 @@ echo -e "New tag: ${NEW_TAG}"
 # Get the commit hash for the new tag
 NEW_TAG_COMMIT=$(git rev-list -n 1 "${NEW_TAG}")
 
-# Get all commits between tags, excluding the old tag's commit
-COMMITS=$(git log "${OLD_TAG}..${NEW_TAG_COMMIT}" --pretty=format:"%s")
+# Get all commits between tags, excluding the old tag's commit and README changes
+COMMITS=$(git log "${OLD_TAG}..${NEW_TAG_COMMIT}" --pretty=format:"%s" -- . ':!README.md')
 
-# Get the diff between tags
-DIFF=$(git diff "${OLD_TAG}..${NEW_TAG}")
+# Get the diff between tags, excluding README.md
+DIFF=$(git diff "${OLD_TAG}..${NEW_TAG}" -- . ':!README.md')
 
 generate_changelog() {
     local include_diff=$1
@@ -57,6 +57,7 @@ You are a technical changelog generator that produces clear, concise, and well-s
    - Focus on significant changes that affect users or the system
    - Include important dependency updates within relevant sections based on their impact
    - Be concise and specific
+   - Exclude documentation changes (like README updates)
 
 2. Format:
    - First line must be "# Version X.Y.Z" (using provided version)
@@ -93,29 +94,7 @@ You are a technical changelog generator that produces clear, concise, and well-s
    - Fixed race condition in concurrent job processing
    - Resolved memory leak in background workers
 
-Respond with only the changelog content.ative elements
-
-4. Output Format Example:
-   # Version 2.1.0
-
-   ### Breaking Changes
-   - Changed authentication flow to OAuth2-only, existing API keys must be migrated
-   - Upgraded React to v18, requires application-wide updates to use new rendering engine
-
-   ### Features
-   - Added GraphQL API support with full schema documentation
-   - Implemented real-time data synchronization using WebSockets
-
-   ### Improvements
-   - Enhanced caching strategy, reducing average response time by 45%
-   - Updated Redis client to v7.2, improving connection stability
-   - Standardized error responses across all API endpoints
-
-   ### Bug Fixes
-   - Resolved race condition in concurrent file uploads
-   - Fixed memory leak in WebSocket connection handling
-
-Respond with only the changelog content, no explanations or additional text.
+Respond with only the changelog content.
 EOT
 )
     local escaped_system=$(echo "$system_message" | jq -R -s .)
