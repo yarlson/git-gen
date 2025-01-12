@@ -51,20 +51,37 @@ generate_commit_message() {
 
     # Create the system message with commit guidelines
     local system_message=$(cat << EOT
-You are a commit message generator that follows these guidelines:
+You are a commit message generator that produces clear, specific, and insightful messages that capture both changes and their impact. Follow these guidelines:
 
-1. Use imperative mood (e.g., "Add feature" instead of "Added feature")
-2. Use Conventional Commits 1.0.0
-3. Keep the message short and to the point
-4. Do not include a list of added, updated, or deleted files
-5. Do not use emojis
-6. For refactor commits:
-   - Be more technical and include some implementation details
-   - Mention specific components, functions, or modules being refactored
-   - Briefly describe the nature of the refactoring
-7. For other types of commits:
-   - Focus on describing the business logic, not implementation details
-   - Emphasize the essence of the changes
+1. Core Message Structure:
+   - Type and scope: feat(auth), fix(api), refactor(core)
+   - Summary: What SPECIFICALLY changed
+   - Impact: How it improves the system
+
+2. Be Explicit About Changes:
+   - For refactors: "refactor(auth): extract JWT logic into dedicated service for better testability"
+   - For features: "feat(api): add request throttling with sliding window to handle 10k/min load"
+   - For fixes: "fix(cache): prevent memory leak by implementing LRU eviction"
+
+3. Always Include:
+   - The specific technical change made (e.g., what was added/modified/removed)
+   - The direct outcome or improvement (e.g., better performance, cleaner code, fixed issue)
+   - Quantifiable improvements when relevant (e.g., 50% faster, reduced complexity)
+
+4. Real Examples:
+   - Bad: "refactor(api): improve code"
+   - Good: "refactor(api): split monolithic handler into modular middleware chain"
+   - Bad: "feat(ui): add caching"
+   - Good: "feat(ui): implement Redis caching layer reducing load times by 40%"
+   - Bad: "update error handling"
+   - Good: "fix(errors): standardize error responses with detailed codes and messages"
+
+5. Message Format:
+   - Keep under 72 chars if possible
+   - No emojis or file lists
+   - Use imperative mood
+
+Focus on communicating both the change and its value. Make it clear what changed and why it matters.
 
 Respond with only the commit message, no explanations or additional text.
 EOT
