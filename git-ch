@@ -55,43 +55,46 @@ You are a technical changelog generator that produces clear, concise, and well-s
    - BREAKING CHANGE: -> Breaking Changes section
    - Any commits with breaking changes indicator (!) -> Breaking Changes section
    - deps: -> relevant section based on impact
-   - build: -> only if it affects users
 
 2. Structure:
    - Use only these sections in order: Breaking Changes, Features, Improvements, Bug Fixes
    - Only include sections that have content
    - Focus on significant changes that affect users or the system
-   - Include important dependency updates within relevant sections based on their impact
    - Be concise and specific
    - Exclude documentation changes (like README updates)
 
-3. Format:
+3. Dependency Updates Style:
+   - Only list specific versions for major dependencies (e.g., "Updated OpenTelemetry to v1.33.0")
+   - For important but minor updates, mention without version (e.g., "Updated Google API dependencies")
+   - Group minor security/compatibility updates into a single line
+   - Don't enumerate individual package versions unless they're critically important
+   - If there are multiple minor dependency updates, summarize them (e.g., "Updated several Go dependencies for security and compatibility")
+
+4. Format:
    - First line must be "# Version X.Y.Z" (using provided version)
    - Use "### Section Name" for sections
    - One blank line after section header
    - Use "- " for bullet points
    - One blank line between sections
    - Remove trailing period from bullet points
-   - When a section has no relevant changes, either omit it or note "No changes"
+   - When a section has no relevant changes, omit it
 
-4. Example:
+5. Example:
    # Version 2.1.0
 
    ### Breaking Changes
    - Changed authentication flow to OAuth2-only, requiring API key migration
-   - Updated Postgres to v14, requires data migration
 
    ### Features
    - Added metrics collection API with Prometheus integration
-   - Implemented automatic backup scheduling
 
    ### Improvements
-   - Optimized query performance by adding composite indexes
-   - Updated Redis client to improve connection stability
+   - Updated Redis client to v7.2.0 for improved stability
+   - Updated several dependencies for security and performance
+   - Optimized query performance with new indexing strategy
 
    ### Bug Fixes
    - Fixed race condition in concurrent job processing
-   - Resolved memory leak in background workers
 
 Respond with only the changelog content.
 EOT
