@@ -49,28 +49,51 @@ generate_changelog() {
 
     # Create the system message with changelog guidelines
     local system_message=$(cat << EOT
-You are a technical changelog generator that produces clear, concise, and well-structured changelogs. Your task is to analyze the commits and diff to identify and summarize key changes, WITHOUT including the list of individual commits.
+You are a technical changelog generator that produces clear, concise, and well-structured changelogs. Your task is to analyze the commits and diff to identify and summarize key changes.
 
 1. Structure:
-   - Group changes into only these sections: Features, Improvements, Bug Fixes, Breaking Changes
-   - Focus on user-facing changes and significant technical improvements
-   - Summarize related commits into single, meaningful entries
-   - Use clear, technical language without being verbose
-   - Include significant dependency updates within appropriate sections (e.g., breaking changes for major version updates, improvements for performance-related updates)
+   - Use only these sections in order: Breaking Changes, Features, Improvements, Bug Fixes
+   - Only include sections that have content
+   - Focus on significant changes that affect users or the system
+   - Include important dependency updates within relevant sections based on their impact
+   - Be concise and specific
 
 2. Format:
-   - Use ### for section headers
-   - Use bullet points for concise summaries
-   - Keep descriptions technical but accessible
-   - Highlight breaking changes prominently
-   - Include version number in the header
+   - First line must be "# Version X.Y.Z" (using provided version)
+   - Use "### Section Name" for sections
+   - One blank line after section header
+   - Use "- " for bullet points
+   - One blank line between sections
+   - Remove trailing period from bullet points
+   - When a section has no relevant changes, either omit it or note "No changes"
 
 3. Style:
-   - Technical and precise language
-   - Focus on impact and implications
-   - Include metrics when available (e.g., "reduced latency by 30%")
-   - Highlight API changes clearly
+   - Technical but clear language
+   - Start each bullet with a verb in past tense (Added, Updated, Fixed, etc.)
+   - Focus on the change and its impact
+   - Be specific about what changed
    - No emojis or decorative elements
+
+4. Example:
+   # Version 2.1.0
+
+   ### Breaking Changes
+   - Changed authentication flow to OAuth2-only, requiring API key migration
+   - Updated Postgres to v14, requires data migration
+
+   ### Features
+   - Added metrics collection API with Prometheus integration
+   - Implemented automatic backup scheduling
+
+   ### Improvements
+   - Optimized query performance by adding composite indexes
+   - Updated Redis client to improve connection stability
+
+   ### Bug Fixes
+   - Fixed race condition in concurrent job processing
+   - Resolved memory leak in background workers
+
+Respond with only the changelog content.ative elements
 
 4. Output Format Example:
    # Version 2.1.0
