@@ -6,21 +6,20 @@
 
 ## Features
 
-- **Smart Commit Message Generation**: Uses Claude to analyze your changes and generate contextually relevant commit messages
-- **Interactive Workflow**: Review, regenerate, or edit suggested commit messages
-- **Conventional Commits**: Follows standard commit message formats and best practices
-- **Context-Aware**: Analyzes file changes, diffs, and previous commit history for consistency
+- Generates commit messages by analyzing git diff and staged changes
+- Analyzes repository commit history for consistency
+- Interactive commit message selection and editing
+- Follows Conventional Commits specification
+- Optional: Accepts user input when change purpose needs clarification
 
 ## Installation
 
 1. **Clone the Repository**:
-
    ```bash
    git clone https://github.com/yarlson/git-gen.git
    ```
 
 2. **Make the Script Executable**:
-
    ```bash
    chmod +x git-gen
    ```
@@ -32,20 +31,21 @@
 
 ## Usage
 
-Within any Git repository, simply run:
+Within any Git repository:
 
 ```bash
-git gen
+git gen                     # Generate message based on changes
+git gen "purpose details"   # Optional: Provide context if purpose isn't clear from the changes
 ```
 
-The script will:
-
-1. Analyze your repository changes
-2. Generate a commit message using Claude
-3. Present options to:
-   - Accept the message (y)
-   - Generate a new one (n)
-   - Edit the message (e)
+The script:
+1. Stages changes (`git add .`)
+2. Analyzes the repository state
+3. Generates a commit message
+4. Prompts for action:
+   - `y` - accept and commit
+   - `n` - generate new message
+   - `e` - edit in $EDITOR
 
 ## Requirements
 
@@ -85,7 +85,6 @@ The generator follows these principles:
 - Maintains consistency with your repository's commit history
 
 Example messages:
-
 ```
 feat(api): implement rate limiting to handle 10k requests/min
 fix(cache): resolve memory leak by adding LRU eviction

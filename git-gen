@@ -20,6 +20,9 @@ fi
 
 cd "$REPO_DIR" || exit 1
 
+# Get user input if provided
+USER_INPUT="$*"
+
 # Add all changes to the index
 git add .
 
@@ -41,6 +44,7 @@ generate_commit_message() {
     local escaped_deleted=$(echo "$DELETED_FILES" | jq -R -s .)
     local escaped_modified=$(echo "$MODIFIED_FILES" | jq -R -s .)
     local escaped_diff=$(echo "$DIFF" | jq -R -s .)
+    local escaped_input=$(echo "$USER_INPUT" | jq -R -s .)
 
     # Create the system message with commit guidelines
     local system_message=$(cat << EOT
@@ -84,6 +88,8 @@ EOT
     # Create the user message with the context and changes
     local user_message=$(cat << EOT
 <context>
+  <userInput>${escaped_input}</userInput>
+
   <previousCommits>
 ${escaped_commits}
   </previousCommits>
@@ -107,7 +113,7 @@ ${escaped_diff}
   </changes>
 </context>
 
-Based on the context above, generate a commit message that follows the guidelines. Maintain consistency with previous commit messages where appropriate.
+Based on the context above and the user input (if provided), generate a commit message that follows the guidelines. Consider the user\'s input as additional context for understanding the changes. Maintain consistency with previous commit messages where appropriate.
 EOT
 )
     local escaped_user=$(echo "$user_message" | jq -R -s .)
