@@ -49,11 +49,11 @@ generate_commit_message() {
     local escaped_modified=$(echo "$MODIFIED_FILES" | jq -R -s .)
     local escaped_diff=$(echo "$DIFF" | jq -R -s .)
 
-    # Create the instructions with variable substitution
-    local instructions=$(cat << EOT
-You are tasked with generating a concise and meaningful commit message based on code changes. Follow these guidelines to create an effective commit message:
+    # Create the system message with commit guidelines
+    local system_message=$(cat << EOT
+You are a commit message generator that follows these guidelines:
 
-1. Use imperative mood (e.g., \"Add feature\" instead of \"Added feature\")
+1. Use imperative mood (e.g., "Add feature" instead of "Added feature")
 2. Use Conventional Commits 1.0.0
 3. Keep the message short and to the point
 4. Do not include a list of added, updated, or deleted files
@@ -61,47 +61,48 @@ You are tasked with generating a concise and meaningful commit message based on 
 6. For refactor commits:
    - Be more technical and include some implementation details
    - Mention specific components, functions, or modules being refactored
-   - Briefly describe the nature of the refactoring (e.g., \"Extract method\", \"Rename variable\", \"Optimize algorithm\")
+   - Briefly describe the nature of the refactoring
 7. For other types of commits:
    - Focus on describing the business logic, not implementation details
    - Emphasize the essence of the changes
 
-First, review the following previous commit messages for consistency:
-<lastCommits>
-${escaped_commits}
-</lastCommits>
-
-Now, examine the lists of files that have been affected:
-
-Added files:
-<addedFiles>
-${escaped_added}
-</addedFiles>
-
-Deleted files:
-<deletedFiles>
-${escaped_deleted}
-</deletedFiles>
-
-Modified files:
-<modifiedFiles>
-${escaped_modified}
-</modifiedFiles>
-
-Finally, analyze the diff of the changes:
-
-<diff>
-${escaped_diff}
-</diff>
-
-Based on this information, generate a short commit message that captures the essence of the changes. For refactor commits, include more technical details and specific components being refactored. For other types of commits, focus on the business logic and maintain consistency with the previous commit messages. Remember to use imperative mood.
-
-Provide only the commit message. Do not include any explanation or description of the commit message itself.
+Respond with only the commit message, no explanations or additional text.
 EOT
 )
-    local escaped_instructions=$(echo "$instructions" | jq -R -s .)
+    local escaped_system=$(echo "$system_message" | jq -R -s .)
 
-    # Use heredoc for the payload with the escaped content
+    # Create the user message with the context and changes
+    local user_message=$(cat << EOT
+<context>
+  <previousCommits>
+${escaped_commits}
+  </previousCommits>
+
+  <changes>
+    <addedFiles>
+${escaped_added}
+    </addedFiles>
+
+    <deletedFiles>
+${escaped_deleted}
+    </deletedFiles>
+
+    <modifiedFiles>
+${escaped_modified}
+    </modifiedFiles>
+
+    <diff>
+${escaped_diff}
+    </diff>
+  </changes>
+</context>
+
+Based on the context above, generate a commit message that follows the guidelines. Maintain consistency with previous commit messages where appropriate.
+EOT
+)
+    local escaped_user=$(echo "$user_message" | jq -R -s .)
+
+    # Use heredoc for the payload with the escaped content and system message
     local response=$(curl -s -X POST \
         https://api.anthropic.com/v1/messages \
         --header "x-api-key: $ANTHROPIC_API_KEY" \
@@ -111,17 +112,30 @@ EOT
 {
     "model": "claude-3-5-sonnet-20240620",
     "max_tokens": 1024,
+    "system": ${escaped_system},
     "messages": [
         {
             "role": "user",
-            "content": ${escaped_instructions}
+            "content": ${escaped_user}
         }
     ]
 }
 EOF
 )
-    # Extract the commit message from the response
-    echo "$response" | jq -r '.content[0].text // empty'
+    # Check if the response contains an error
+    if echo "$response" | jq -e 'has("error")' > /dev/null; then
+        echo -e "${RED}API Error: $(echo "$response" | jq -r '.error.message')${NC}" >&2
+        return 1
+    fi
+
+    # Extract and verify the commit message
+    local commit_message=$(echo "$response" | jq -r '.content[0].text // empty')
+    if [ -z "$commit_message" ]; then
+        echo -e "${RED}Error: Empty commit message in response${NC}" >&2
+        return 1
+    fi
+
+    echo "$commit_message"
 }
 
 while true; do
