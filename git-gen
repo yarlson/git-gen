@@ -26,13 +26,16 @@ USER_INPUT="$*"
 # Add all changes to the index
 git add .
 
-# Get list of changed files
-ADDED_FILES=$(git diff --cached --name-only --diff-filter=A)
-DELETED_FILES=$(git diff --cached --name-only --diff-filter=D)
-MODIFIED_FILES=$(git diff --cached --name-only --diff-filter=M)
+# Get list of changed files, excluding package-lock.json and go.sum
+# Common lock files to exclude
+LOCK_FILES_PATTERN='package-lock.json|yarn.lock|pnpm-lock.yaml|go.sum|Cargo.lock|Gemfile.lock|poetry.lock|composer.lock|mix.lock|gradle.lockfile|pdm.lock|bun.lockb'
 
-# Get current diff
-DIFF=$(git diff --cached)
+ADDED_FILES=$(git diff --cached --name-only --diff-filter=A | grep -v -E "$LOCK_FILES_PATTERN")
+DELETED_FILES=$(git diff --cached --name-only --diff-filter=D | grep -v -E "$LOCK_FILES_PATTERN")
+MODIFIED_FILES=$(git diff --cached --name-only --diff-filter=M | grep -v -E "$LOCK_FILES_PATTERN")
+
+# Get current diff, excluding lock files
+DIFF=$(git diff --cached -- . ':!package-lock.json' ':!yarn.lock' ':!pnpm-lock.yaml' ':!go.sum' ':!Cargo.lock' ':!Gemfile.lock' ':!poetry.lock' ':!composer.lock' ':!mix.lock' ':!gradle.lockfile' ':!pdm.lock' ':!bun.lockb')
 
 # Get last 10 commit messages
 LAST_10_COMMITS=$(git log -n 10 --pretty=format:"%s")
